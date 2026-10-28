@@ -1,0 +1,1319 @@
+<!DOCTYPE html>
+<html lang="es" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TRON Vault - Ultra Modern Web3 Wallet</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#eef2ff',
+                            500: '#ef4444',
+                            600: '#dc2626',
+                            700: '#b91c1c',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Telegram Web App SDK -->
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <!-- FontAwesome & Google Fonts -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Plus Jakarta Sans', sans-serif; }
+        .glass { background: rgba(255, 255, 255, 0.03); backdrop-filter: blur(16px); border: 1px solid rgba(255, 255, 255, 0.08); }
+        .dark .glass-dark { background: rgba(15, 23, 42, 0.75); backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, 0.05); }
+        .light .glass-light { background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(20px); border: 1px solid rgba(0, 0, 0, 0.08); }
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(156, 163, 175, 0.3); border-radius: 9999px; }
+        ::-webkit-scrollbar-thumb:hover { background: rgba(156, 163, 175, 0.5); }
+        @keyframes pulse-slow { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+        .animate-pulse-slow { animation: pulse-slow 3s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex items-center justify-center transition-colors duration-300">
+
+    <!-- CONTENEDOR GENERAL DE LA APLICACIÓN -->
+    <div id="app" class="w-full max-w-md min-h-screen sm:min-h-[850px] sm:max-h-[92vh] sm:rounded-3xl sm:shadow-2xl overflow-hidden flex flex-col relative bg-slate-900 border border-slate-800 transition-all duration-300">
+
+        <!-- ================= 1. VISTA DE AUTENTICACIÓN (TELEGRAM AUTO-DETECTADO + PIN) ================= -->
+        <section id="view-auth" class="flex-1 flex flex-col justify-between p-6 sm:p-8 relative overflow-y-auto">
+            <div class="absolute -top-24 -right-24 w-72 h-72 bg-red-600/20 rounded-full blur-3xl pointer-events-none"></div>
+            <div class="absolute -bottom-24 -left-24 w-72 h-72 bg-blue-600/10 rounded-full blur-3xl pointer-events-none"></div>
+
+            <div class="z-10 mt-6 text-center">
+                <div class="w-16 h-16 mx-auto mb-4 rounded-2xl bg-gradient-to-tr from-red-600 to-amber-500 flex items-center justify-center shadow-lg shadow-red-500/30 text-white text-2xl font-black">
+                    <i class="fa-solid fa-cube"></i>
+                </div>
+                <h1 class="text-2xl font-bold tracking-tight">TRON Vault</h1>
+                <p class="text-slate-400 text-sm mt-1">Billetera Descentralizada Red TRON</p>
+            </div>
+
+            <!-- Formulario Dinámico de Acceso con Telegram SDK -->
+            <div class="z-10 my-auto py-6 space-y-4">
+                <div id="auth-mode-indicator" class="text-xs font-semibold uppercase tracking-wider text-center text-red-500 mb-2">
+                    Detectando Telegram ID...
+                </div>
+
+                <!-- ID de Telegram (Bloqueado/Automático) -->
+                <div class="space-y-1">
+                    <label class="text-xs font-medium text-slate-400">ID de Telegram (Verificado por Telegram)</label>
+                    <div class="relative">
+                        <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-500">
+                            <i class="fa-brands fa-telegram text-blue-400"></i>
+                        </span>
+                        <input type="text" id="auth-telegram-id" readonly 
+                            class="w-full pl-10 pr-10 py-3 rounded-xl bg-slate-800/90 border border-slate-700 text-slate-300 font-mono text-sm focus:outline-none cursor-not-allowed select-none"
+                            title="El ID de Telegram es automático y no se puede modificar">
+                        <span class="absolute inset-y-0 right-0 pr-3.5 flex items-center pointer-events-none text-emerald-400 text-xs" title="Verificado">
+                            <i class="fa-solid fa-circle-check"></i>
+                        </span>
+                    </div>
+                    <p id="telegram-id-feedback" class="text-xs text-slate-400 mt-1"></p>
+                </div>
+
+                <div class="space-y-1">
+                    <label class="text-xs font-medium text-slate-400">PIN de Acceso (6 Dígitos)</label>
+                    <div class="relative">
+                        <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-500">
+                            <i class="fa-solid fa-lock"></i>
+                        </span>
+                        <input type="password" id="auth-pin" maxlength="6" placeholder="******" 
+                            class="w-full pl-10 pr-10 py-3 rounded-xl bg-slate-800/80 border border-slate-700/80 focus:border-red-500 focus:outline-none text-sm tracking-widest transition-all">
+                        <button onclick="togglePinVisibility('auth-pin', 'eye-auth')" class="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-500 hover:text-slate-300">
+                            <i id="eye-auth" class="fa-solid fa-eye text-xs"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <div id="multi-account-option" class="space-y-1 hidden pt-1">
+                    <label class="flex items-center space-x-2 cursor-pointer">
+                        <input type="checkbox" id="create-new-subaccount" class="accent-red-500 w-4 h-4 rounded">
+                        <span class="text-xs text-slate-300">Crear una nueva subcuenta / billetera adicional con este ID</span>
+                    </label>
+                </div>
+
+                <button onclick="handleAuthSubmit()" class="w-full py-3.5 rounded-xl bg-gradient-to-r from-red-600 to-red-500 hover:from-red-500 hover:to-red-400 text-white font-semibold shadow-lg shadow-red-600/25 transition-all transform active:scale-95 text-sm mt-2">
+                    Acceder a la Billetera
+                </button>
+            </div>
+
+            <div class="z-10 text-center text-xs text-slate-500 pb-2">
+                Red TRON (TRC-20) • Telegram Mini App Auth
+            </div>
+        </section>
+
+
+        <!-- ================= 2. VISTA PRINCIPAL DE LA BILLETERA ================= -->
+        <section id="view-wallet" class="flex-1 flex flex-col justify-between hidden overflow-hidden">
+            <!-- Header de la Billetera -->
+            <div class="px-6 pt-5 pb-3 flex items-center justify-between border-b border-slate-800/60">
+                <div class="flex items-center space-x-3">
+                    <div class="w-10 h-10 rounded-full bg-gradient-to-tr from-red-600 to-amber-500 flex items-center justify-center text-white font-bold text-sm shadow-md" id="user-avatar">
+                        T
+                    </div>
+                    <div>
+                        <div class="flex items-center space-x-1.5">
+                            <h2 class="font-bold text-sm" id="display-telegram-id">Telegram ID</h2>
+                            <span id="badge-admin" class="hidden bg-red-500/10 text-red-400 border border-red-500/20 text-[10px] px-1.5 py-0.5 rounded-full font-bold">ADMIN</span>
+                        </div>
+                        <p class="text-[11px] text-slate-400 font-mono flex items-center space-x-1 cursor-pointer hover:text-slate-200" onclick="copyWalletAddress()">
+                            <span id="short-address">TGC7Ym...Z1JUs</span> <i class="fa-regular fa-copy text-[10px]"></i>
+                        </p>
+                    </div>
+                </div>
+                <div class="flex items-center space-x-2">
+                    <button onclick="openAdminPanel()" id="btn-admin-panel" class="hidden w-9 h-9 rounded-xl bg-red-600/20 text-red-400 border border-red-500/30 flex items-center justify-center hover:bg-red-600/30 transition-colors" title="Panel de Administración">
+                        <i class="fa-solid fa-shield-halved text-xs"></i>
+                    </button>
+                    <button onclick="switchTab('settings')" class="w-9 h-9 rounded-xl bg-slate-800 border border-slate-700/60 flex items-center justify-center text-slate-300 hover:text-white transition-colors">
+                        <i class="fa-solid fa-gear text-xs"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Contenido Dinámico de Pestañas -->
+            <div class="flex-1 overflow-y-auto p-6 space-y-6">
+
+                <!-- TAB: WALLET -->
+                <div id="tab-wallet" class="space-y-6 tab-content">
+                    <div class="relative rounded-2xl bg-gradient-to-br from-slate-900 via-slate-850 to-slate-900 border border-slate-800 p-6 shadow-xl overflow-hidden">
+                        <div class="absolute -right-10 -bottom-10 w-40 h-40 bg-red-600/10 rounded-full blur-2xl"></div>
+                        <div class="flex items-center justify-between">
+                            <p class="text-xs text-slate-400 font-medium">Balance Total Estimado</p>
+                            <span id="account-badge" class="text-[10px] bg-slate-800 text-slate-300 px-2 py-0.5 rounded-full border border-slate-700">Cuenta 1</span>
+                        </div>
+                        <h2 class="text-3xl font-extrabold tracking-tight mt-1" id="total-balance-usd">$0.00</h2>
+                        <div class="flex items-center space-x-2 mt-2">
+                            <span class="inline-flex items-center text-xs font-semibold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-md">
+                                <i class="fa-solid fa-arrow-trend-up mr-1 text-[10px]"></i> +2.45%
+                            </span>
+                            <span class="text-xs text-slate-400">Red TRON (TRC-20)</span>
+                        </div>
+
+                        <div class="grid grid-cols-4 gap-3 mt-6 pt-5 border-t border-slate-800/80">
+                            <button onclick="openModal('qr')" class="flex flex-col items-center space-y-1.5 group">
+                                <div class="w-11 h-11 rounded-xl bg-red-600/15 text-red-500 group-hover:bg-red-600 group-hover:text-white flex items-center justify-center transition-all shadow-sm">
+                                    <i class="fa-solid fa-arrow-down text-sm"></i>
+                                </div>
+                                <span class="text-[11px] font-medium text-slate-300">Depositar</span>
+                            </button>
+                            <button onclick="openModal('withdraw')" class="flex flex-col items-center space-y-1.5 group">
+                                <div class="w-11 h-11 rounded-xl bg-slate-800 text-slate-300 group-hover:bg-red-600 group-hover:text-white flex items-center justify-center transition-all shadow-sm">
+                                    <i class="fa-solid fa-arrow-up text-sm"></i>
+                                </div>
+                                <span class="text-[11px] font-medium text-slate-300">Retirar</span>
+                            </button>
+                            <button onclick="switchTab('swap')" class="flex flex-col items-center space-y-1.5 group">
+                                <div class="w-11 h-11 rounded-xl bg-slate-800 text-slate-300 group-hover:bg-red-600 group-hover:text-white flex items-center justify-center transition-all shadow-sm">
+                                    <i class="fa-solid fa-right-left text-sm"></i>
+                                </div>
+                                <span class="text-[11px] font-medium text-slate-300">Swap</span>
+                            </button>
+                            <button onclick="switchTab('staking')" class="flex flex-col items-center space-y-1.5 group">
+                                <div class="w-11 h-11 rounded-xl bg-slate-800 text-slate-300 group-hover:bg-red-600 group-hover:text-white flex items-center justify-center transition-all shadow-sm">
+                                    <i class="fa-solid fa-coins text-sm"></i>
+                                </div>
+                                <span class="text-[11px] font-medium text-slate-300">Staking</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div>
+                        <div class="flex items-center justify-between mb-3">
+                            <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400">Activos en Red TRON</h3>
+                            <button onclick="refreshPrices()" class="text-xs text-red-400 hover:text-red-300 flex items-center space-x-1">
+                                <i id="refresh-icon" class="fa-solid fa-rotate"></i> <span>Actualizar</span>
+                            </button>
+                        </div>
+                        <div class="space-y-2.5" id="token-list"></div>
+                    </div>
+
+                    <div>
+                        <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3">Últimas Operaciones</h3>
+                        <div class="space-y-2" id="transactions-list"></div>
+                    </div>
+                </div>
+
+                <!-- TAB: SWAP -->
+                <div id="tab-swap" class="space-y-4 tab-content hidden">
+                    <div class="rounded-2xl bg-slate-900 border border-slate-800 p-5 space-y-4 shadow-xl">
+                        <div class="flex items-center justify-between">
+                            <h3 class="font-bold text-sm">TRON Instant Swap</h3>
+                            <span class="text-xs text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded">0.1% Fee</span>
+                        </div>
+                        <div class="p-3.5 rounded-xl bg-slate-800/60 border border-slate-700/60 space-y-2">
+                            <div class="flex justify-between text-xs text-slate-400">
+                                <span>Pagas</span>
+                                <span id="swap-bal-from">Saldo: 0.00</span>
+                            </div>
+                            <div class="flex items-center justify-between">
+                                <input type="number" id="swap-amount-from" placeholder="0.00" class="bg-transparent text-xl font-bold focus:outline-none w-1/2" oninput="calculateSwap()">
+                                <select id="swap-token-from" class="bg-slate-700 text-xs font-semibold py-2 px-3 rounded-lg focus:outline-none" onchange="calculateSwap()">
+                                    <option value="TRX">TRX</option>
+                                    <option value="USDT">USDT</option>
+                                    <option value="USDD">USDD</option>
+                                    <option value="JST">JST</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="flex justify-center -my-2 relative z-10">
+                            <button onclick="invertSwapTokens()" class="w-9 h-9 rounded-full bg-red-600 text-white flex items-center justify-center shadow-md hover:bg-red-500 transition-transform active:rotate-180">
+                                <i class="fa-solid fa-arrow-down-up text-xs"></i>
+                            </button>
+                        </div>
+
+                        <div class="p-3.5 rounded-xl bg-slate-800/60 border border-slate-700/60 space-y-2">
+                            <div class="flex justify-between text-xs text-slate-400">
+                                <span>Recibes (Estimado)</span>
+                                <span id="swap-bal-to">Saldo: 0.00</span>
+                            </div>
+                            <div class="flex items-center justify-between">
+                                <input type="text" id="swap-amount-to" readonly placeholder="0.00" class="bg-transparent text-xl font-bold text-emerald-400 focus:outline-none w-1/2">
+                                <select id="swap-token-to" class="bg-slate-700 text-xs font-semibold py-2 px-3 rounded-lg focus:outline-none" onchange="calculateSwap()">
+                                    <option value="USDT">USDT</option>
+                                    <option value="TRX">TRX</option>
+                                    <option value="USDD">USDD</option>
+                                    <option value="JST">JST</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div id="swap-fee-notice" class="text-[11px] text-amber-400 font-medium px-1 hidden"></div>
+
+                        <button onclick="executeSwap()" class="w-full py-3.5 rounded-xl bg-gradient-to-r from-red-600 to-red-500 hover:from-red-500 hover:to-red-400 font-semibold text-white text-sm shadow-lg shadow-red-600/20 transition-all">
+                            Realizar Swap Instantáneo
+                        </button>
+                    </div>
+                </div>
+
+                <!-- TAB: STAKING -->
+                <div id="tab-staking" class="space-y-4 tab-content hidden">
+                    <div class="rounded-2xl bg-gradient-to-br from-red-950/40 via-slate-900 to-slate-900 border border-red-900/30 p-5 space-y-4 shadow-xl">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <h3 class="font-bold text-sm">TRON Smart Staking</h3>
+                                <p class="text-xs text-slate-400">Rendimiento anual garantizado</p>
+                            </div>
+                            <span class="bg-red-500/20 text-red-400 border border-red-500/30 font-extrabold text-xs px-2.5 py-1 rounded-full">5.7% APY</span>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-3 pt-2">
+                            <div class="p-3 rounded-xl bg-slate-800/60 border border-slate-700/60">
+                                <p class="text-[11px] text-slate-400">En Staking</p>
+                                <p class="text-base font-bold mt-0.5" id="staking-active-amount">0.00 TRX</p>
+                            </div>
+                            <div class="p-3 rounded-xl bg-slate-800/60 border border-slate-700/60">
+                                <p class="text-[11px] text-slate-400">Recompensas Ganadas</p>
+                                <p class="text-base font-bold text-emerald-400 mt-0.5" id="staking-rewards">0.00 TRX</p>
+                            </div>
+                        </div>
+
+                        <div class="space-y-2 pt-2">
+                            <label class="text-xs font-medium text-slate-400">Monto a Bloquear en TRX</label>
+                            <input type="number" id="staking-input-amount" placeholder="Mínimo 10 TRX" class="w-full p-3 rounded-xl bg-slate-800/80 border border-slate-700 text-sm focus:border-red-500 focus:outline-none">
+                            <button onclick="executeStaking()" class="w-full py-3 rounded-xl bg-red-600 hover:bg-red-500 font-semibold text-white text-sm shadow-lg shadow-red-600/20 transition-all">
+                                Depositar en Staking (5.7%)
+                            </button>
+                            <button onclick="claimStakingRewards()" class="w-full py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 font-medium text-slate-200 text-xs transition-all">
+                                Reclamar Recompensas
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- TAB: REFERIDOS -->
+                <div id="tab-referrals" class="space-y-4 tab-content hidden">
+                    <div class="rounded-2xl bg-slate-900 border border-slate-800 p-5 space-y-4 shadow-xl">
+                        <div>
+                            <h3 class="font-bold text-sm">Sistema de Referidos TRON</h3>
+                            <p class="text-xs text-slate-400 mt-0.5">Gana un <span class="text-emerald-400 font-bold">2% de ganancias</span> por cada depósito que realicen tus referidos.</p>
+                        </div>
+
+                        <div class="p-3.5 rounded-xl bg-slate-800/80 border border-slate-700/60 space-y-2">
+                            <label class="text-[11px] text-slate-400 font-medium">Tu Enlace de Invitación</label>
+                            <div class="flex items-center space-x-2">
+                                <input type="text" id="referral-link" readonly value="https://tronvault.io/ref/user" class="w-full bg-slate-900 px-3 py-2 rounded-lg text-xs font-mono text-slate-300 border border-slate-700 focus:outline-none">
+                                <button onclick="copyReferralLink()" class="px-3 py-2 bg-red-600 hover:bg-red-500 text-white rounded-lg text-xs font-semibold">
+                                    <i class="fa-regular fa-copy"></i>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-3">
+                            <div class="p-3 rounded-xl bg-slate-800/60 border border-slate-700/60 text-center">
+                                <p class="text-[11px] text-slate-400">Total Referidos</p>
+                                <p class="text-lg font-bold mt-1" id="ref-count">0</p>
+                            </div>
+                            <div class="p-3 rounded-xl bg-slate-800/60 border border-slate-700/60 text-center">
+                                <p class="text-[11px] text-slate-400">Comisiones Ganadas</p>
+                                <p class="text-lg font-bold text-emerald-400 mt-1" id="ref-earnings">0.00 USDT</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- TAB: AJUSTES -->
+                <div id="tab-settings" class="space-y-4 tab-content hidden">
+                    <div class="space-y-3">
+                        <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400">Configuración de Cuenta & Multi-cuentas</h3>
+                        
+                        <!-- Selector de Cuentas -->
+                        <div class="p-4 rounded-xl bg-slate-900 border border-slate-800 space-y-3">
+                            <div class="flex items-center justify-between">
+                                <div class="flex items-center space-x-3">
+                                    <div class="w-9 h-9 rounded-lg bg-slate-800 flex items-center justify-center text-slate-300">
+                                        <i class="fa-solid fa-wallet text-xs"></i>
+                                    </div>
+                                    <div>
+                                        <p class="text-sm font-semibold">Gestión de Cuentas (Multi-cuentas)</p>
+                                        <p class="text-[11px] text-slate-400">Cambiar de cuenta o crear otra</p>
+                                    </div>
+                                </div>
+                                <button onclick="createNewAccount()" class="px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-500 text-white text-xs font-semibold">
+                                    + Nueva Cuenta
+                                </button>
+                            </div>
+                            <div id="accounts-list-container" class="space-y-2 pt-2 border-t border-slate-800"></div>
+                        </div>
+
+                        <div class="p-4 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-between">
+                            <div class="flex items-center space-x-3">
+                                <div class="w-9 h-9 rounded-lg bg-slate-800 flex items-center justify-center text-slate-300">
+                                    <i class="fa-solid fa-moon text-xs"></i>
+                                </div>
+                                <div>
+                                    <p class="text-sm font-semibold">Modo Oscuro / Claro</p>
+                                    <p class="text-[11px] text-slate-400">Cambiar apariencia visual</p>
+                                </div>
+                            </div>
+                            <button onclick="toggleTheme()" id="theme-toggle-btn" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-semibold">
+                                Cambiar
+                            </button>
+                        </div>
+
+                        <!-- BOTÓN DE SOPORTE -->
+                        <div class="p-4 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-between">
+                            <div class="flex items-center space-x-3">
+                                <div class="w-9 h-9 rounded-lg bg-slate-800 flex items-center justify-center text-slate-300">
+                                    <i class="fa-solid fa-headset text-xs"></i>
+                                </div>
+                                <div>
+                                    <p class="text-sm font-semibold">Soporte Técnico</p>
+                                    <p class="text-[11px] text-slate-400">suportnexuspaywallet@gmail.com</p>
+                                </div>
+                            </div>
+                            <a href="mailto:suportnexuspaywallet@gmail.com" class="px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-500 text-white text-xs font-semibold transition-colors">
+                                Contactar
+                            </a>
+                        </div>
+
+                        <button onclick="logout()" class="w-full py-3 rounded-xl bg-red-600/10 hover:bg-red-600/20 border border-red-500/30 text-red-400 font-semibold text-xs transition-all flex items-center justify-center space-x-2">
+                            <i class="fa-solid fa-right-from-bracket"></i>
+                            <span>Cerrar Sesión</span>
+                        </button>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Navegación Inferior -->
+            <div class="px-6 py-3 border-t border-slate-800/60 bg-slate-900/90 flex items-center justify-around">
+                <button onclick="switchTab('wallet')" id="nav-wallet" class="flex flex-col items-center space-y-1 text-red-500 transition-colors">
+                    <i class="fa-solid fa-wallet text-sm"></i>
+                    <span class="text-[10px] font-semibold">Wallet</span>
+                </button>
+                <button onclick="switchTab('swap')" id="nav-swap" class="flex flex-col items-center space-y-1 text-slate-400 hover:text-slate-200 transition-colors">
+                    <i class="fa-solid fa-right-left text-sm"></i>
+                    <span class="text-[10px] font-semibold">Swap</span>
+                </button>
+                <button onclick="switchTab('staking')" id="nav-staking" class="flex flex-col items-center space-y-1 text-slate-400 hover:text-slate-200 transition-colors">
+                    <i class="fa-solid fa-coins text-sm"></i>
+                    <span class="text-[10px] font-semibold">Staking</span>
+                </button>
+                <button onclick="switchTab('referrals')" id="nav-referrals" class="flex flex-col items-center space-y-1 text-slate-400 hover:text-slate-200 transition-colors">
+                    <i class="fa-solid fa-users text-sm"></i>
+                    <span class="text-[10px] font-semibold">Referidos</span>
+                </button>
+                <button onclick="switchTab('settings')" id="nav-settings" class="flex flex-col items-center space-y-1 text-slate-400 hover:text-slate-200 transition-colors">
+                    <i class="fa-solid fa-gear text-sm"></i>
+                    <span class="text-[10px] font-semibold">Ajustes</span>
+                </button>
+            </div>
+        </section>
+
+
+        <!-- ================= MODAL: QR Y VERIFICACIÓN HASH ================= -->
+        <div id="modal-qr" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm hidden flex items-center justify-center p-4">
+            <div class="bg-slate-900 border border-slate-800 w-full max-w-sm rounded-2xl p-5 space-y-4 shadow-2xl relative text-center">
+                <div class="flex items-center justify-between">
+                    <h3 class="font-bold text-sm">Depósito Red TRC-20</h3>
+                    <button onclick="closeModal('qr')" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+                </div>
+
+                <div class="bg-amber-500/10 border border-amber-500/20 py-2 px-3 rounded-xl flex items-center justify-between">
+                    <span class="text-xs text-amber-400 font-medium">Tiempo restante:</span>
+                    <span id="deposit-countdown" class="font-mono text-xs font-bold text-amber-400">29:59</span>
+                </div>
+
+                <div class="bg-white p-3 rounded-2xl w-36 h-36 mx-auto flex items-center justify-center shadow-md">
+                    <img id="qr-img" src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=TGC7YmHfBxJhtm5p1h5x1Xmq62kSoZ1JUs" alt="QR TRON" class="w-full h-full object-contain">
+                </div>
+
+                <div class="space-y-1">
+                    <p class="text-[11px] text-slate-400">Dirección Oficial de Depósito:</p>
+                    <div class="flex items-center space-x-2 bg-slate-800 p-2 rounded-xl border border-slate-700">
+                        <input type="text" readonly id="qr-wallet-address" value="TGC7YmHfBxJhtm5p1h5x1Xmq62kSoZ1JUs" class="w-full bg-transparent text-[11px] font-mono text-slate-300 focus:outline-none">
+                        <button onclick="copyQrAddress()" class="text-red-400 hover:text-red-300 px-2"><i class="fa-regular fa-copy"></i></button>
+                    </div>
+                </div>
+
+                <div class="space-y-1 text-left">
+                    <label class="text-xs text-slate-400">Hash de Transacción</label>
+                    <input type="text" id="tx-hash-input" placeholder="Ingresa tu hash de confirmación..." class="w-full p-2.5 rounded-xl bg-slate-800 border border-slate-700 text-xs font-mono focus:outline-none focus:border-red-500" oninput="validateHashInput()">
+                    <p id="tronscan-status" class="text-[10px] text-slate-400 mt-1">Coloca tu hash para verificar la transferencia...</p>
+                </div>
+
+                <button id="btn-confirm-deposit" disabled onclick="completeDeposit()" class="w-full py-3 rounded-xl bg-slate-800 text-slate-500 font-semibold text-xs transition-all cursor-not-allowed">
+                    Verificar y Acreditar Saldo
+                </button>
+            </div>
+        </div>
+
+
+        <!-- ================= MODAL: RETIRAR ================= -->
+        <div id="modal-withdraw" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm hidden flex items-center justify-center p-4">
+            <div class="bg-slate-900 border border-slate-800 w-full max-w-sm rounded-2xl p-5 space-y-4 shadow-2xl relative">
+                <div class="flex items-center justify-between">
+                    <h3 class="font-bold text-sm">Retirar Fondos TRON</h3>
+                    <button onclick="closeModal('withdraw')" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+                </div>
+
+                <div class="space-y-3">
+                    <div class="space-y-1">
+                        <label class="text-xs text-slate-400">Criptomoneda</label>
+                        <select id="withdraw-crypto" class="w-full p-2.5 rounded-xl bg-slate-800 border border-slate-700 text-xs font-semibold focus:outline-none" onchange="calculateWithdrawFee()">
+                            <option value="USDT">USDT (Tether TRC-20)</option>
+                            <option value="TRX">TRX (Tron)</option>
+                            <option value="USDD">USDD</option>
+                            <option value="JST">JST</option>
+                        </select>
+                    </div>
+
+                    <div class="space-y-1">
+                        <label class="text-xs text-slate-400">Dirección de Destino TRC-20</label>
+                        <input type="text" id="withdraw-dest" placeholder="Dirección TRON destino..." class="w-full p-2.5 rounded-xl bg-slate-800 border border-slate-700 text-xs font-mono focus:outline-none focus:border-red-500">
+                    </div>
+
+                    <div class="space-y-1">
+                        <label class="text-xs text-slate-400">Monto a Retirar</label>
+                        <input type="number" id="withdraw-amount" placeholder="0.00" class="w-full p-2.5 rounded-xl bg-slate-800 border border-slate-700 text-xs focus:outline-none focus:border-red-500" oninput="calculateWithdrawFee()">
+                    </div>
+
+                    <div id="withdraw-fee-notice" class="p-3 rounded-xl bg-slate-800/80 border border-slate-700/60 text-xs text-slate-300 space-y-2 hidden">
+                        <p id="withdraw-fee-text" class="text-amber-400 font-medium"></p>
+                        <input type="password" id="withdraw-pin-input" maxlength="6" placeholder="PIN de Seguridad (6 dígitos)" class="w-full p-2.5 rounded-xl bg-slate-900 border border-slate-700 text-xs tracking-widest focus:outline-none focus:border-red-500">
+                    </div>
+
+                    <button onclick="executeWithdraw()" class="w-full py-3 rounded-xl bg-red-600 hover:bg-red-500 text-white font-semibold text-xs shadow-md transition-all">
+                        Confirmar Retiro
+                    </button>
+                </div>
+            </div>
+        </div>
+
+
+        <!-- ================= MODAL: PANEL ADMIN ================= -->
+        <div id="modal-admin-panel" class="fixed inset-0 z-50 bg-black/90 backdrop-blur-md hidden flex items-center justify-center p-4">
+            <div class="bg-slate-900 border border-red-500/30 w-full max-w-md rounded-2xl p-6 space-y-5 shadow-2xl relative max-h-[90vh] overflow-y-auto">
+                <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+                    <div class="flex items-center space-x-2">
+                        <i class="fa-solid fa-shield-halved text-red-500"></i>
+                        <h3 class="font-extrabold text-base text-white">Panel de Administración</h3>
+                    </div>
+                    <button onclick="closeModal('admin-panel')" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+                </div>
+
+                <div class="space-y-3">
+                    <h4 class="text-xs font-bold uppercase tracking-wider text-slate-400">Hashes Oficiales (Uso único por ID de Telegram)</h4>
+                    <div class="space-y-2">
+                        <div class="p-3 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-between text-xs">
+                            <div>
+                                <p class="font-bold text-emerald-400">100 USDT</p>
+                                <p class="font-mono text-[11px] text-slate-300">FWNM1PMUKNKrIdrh</p>
+                            </div>
+                            <button onclick="copyAdminHash('FWNM1PMUKNKrIdrh')" class="px-2.5 py-1.5 bg-red-600 hover:bg-red-500 text-white rounded-lg font-semibold">Copiar</button>
+                        </div>
+                        <div class="p-3 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-between text-xs">
+                            <div>
+                                <p class="font-bold text-emerald-400">25 USDT</p>
+                                <p class="font-mono text-[11px] text-slate-300">BgRvODsZgFXrgpxl</p>
+                            </div>
+                            <button onclick="copyAdminHash('BgRvODsZgFXrgpxl')" class="px-2.5 py-1.5 bg-red-600 hover:bg-red-500 text-white rounded-lg font-semibold">Copiar</button>
+                        </div>
+                        <div class="p-3 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-between text-xs">
+                            <div>
+                                <p class="font-bold text-amber-400">500 TRX</p>
+                                <p class="font-mono text-[11px] text-slate-300">jNKK7p0JPArqCkaT</p>
+                            </div>
+                            <button onclick="copyAdminHash('jNKK7p0JPArqCkaT')" class="px-2.5 py-1.5 bg-red-600 hover:bg-red-500 text-white rounded-lg font-semibold">Copiar</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="space-y-2">
+                    <h4 class="text-xs font-bold uppercase tracking-wider text-slate-400">Usuarios Registrados por Telegram ID</h4>
+                    <div id="admin-users-list" class="space-y-2 max-h-48 overflow-y-auto"></div>
+                </div>
+
+                <button onclick="closeModal('admin-panel')" class="w-full py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-semibold">
+                    Cerrar Panel
+                </button>
+            </div>
+        </div>
+
+
+        <!-- ================= MODAL: VERIFICACIÓN PIN ADMIN (121212) ================= -->
+        <div id="modal-pin-vip" class="fixed inset-0 z-50 bg-black/90 backdrop-blur-md hidden flex items-center justify-center p-4">
+            <div class="bg-slate-900 border border-slate-800 w-full max-w-xs rounded-2xl p-5 space-y-4 shadow-2xl text-center">
+                <div class="w-12 h-12 rounded-full bg-red-600/20 text-red-500 mx-auto flex items-center justify-center text-lg">
+                    <i class="fa-solid fa-lock"></i>
+                </div>
+                <div>
+                    <h3 class="font-bold text-sm">Seguridad Admin Requerida</h3>
+                    <p class="text-xs text-slate-400 mt-1">Ingresa el PIN de seguridad del Panel (121212)</p>
+                </div>
+                <input type="password" id="vip-pin-input" maxlength="6" placeholder="******" class="w-full p-3 rounded-xl bg-slate-800 border border-slate-700 text-center tracking-widest text-sm focus:outline-none focus:border-red-500">
+                <div class="grid grid-cols-2 gap-2">
+                    <button onclick="closeModal('pin-vip')" class="py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-semibold">Cancelar</button>
+                    <button onclick="verifyVipPinCallback()" class="py-2.5 rounded-xl bg-red-600 hover:bg-red-500 text-white text-xs font-semibold">Confirmar</button>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- ================= LÓGICA DE JAVASCRIPT CON TELEGRAM WEB APP SDK ================= -->
+    <script>
+        const ADMIN_TELEGRAM_ID = "Admin_020598";
+        const ADMIN_PIN = "020598";
+        const VIP_PIN = "121212";
+        const OFFICIAL_TRON_ADDRESS = "TGC7YmHfBxJhtm5p1h5x1Xmq62kSoZ1JUs";
+
+        // Hashes oficiales con cantidad y cripto asociada
+        const MASTER_HASHES = {
+            "FWNM1PMUKNKrIdrh": { amount: 100, crypto: "USDT" },
+            "BgRvODsZgFXrgpxl": { amount: 25, crypto: "USDT" },
+            "jNKK7p0JPArqCkaT": { amount: 500, crypto: "TRX" }
+        };
+
+        let tokenPrices = {
+            TRX: 0.245,
+            USDT: 1.00,
+            USDD: 0.999,
+            JST: 0.034
+        };
+
+        let dbUsers = JSON.parse(localStorage.getItem('tron_vault_users')) || {};
+        let currentTelegramId = localStorage.getItem('tron_vault_current_telegram') || null;
+        let currentAccountIndex = parseInt(localStorage.getItem('tron_vault_current_account')) || 0;
+        let currentTheme = localStorage.getItem('tron_vault_theme') || 'dark';
+        let vipPinCallbackType = null;
+        let countdownTimer = null;
+
+        window.addEventListener('DOMContentLoaded', () => {
+            applyTheme(currentTheme);
+            initDefaultAdmin();
+            detectTelegramUser();
+        });
+
+        function initDefaultAdmin() {
+            if (!dbUsers[ADMIN_TELEGRAM_ID]) {
+                dbUsers[ADMIN_TELEGRAM_ID] = {
+                    telegramId: ADMIN_TELEGRAM_ID,
+                    pin: ADMIN_PIN,
+                    isAdmin: true,
+                    usedHashes: [],
+                    accounts: [
+                        { name: "Admin Vault", balances: { TRX: 12500, USDT: 45000.50, USDD: 1200, JST: 5400 }, staking: { amount: 2500, rewards: 142.50 }, referrals: { count: 18, earnings: 850.00 }, transactions: [] }
+                    ]
+                };
+            }
+            saveDb();
+        }
+
+        function saveDb() {
+            localStorage.setItem('tron_vault_users', JSON.stringify(dbUsers));
+        }
+
+        // Detección automática del ID de Telegram vía Telegram Web App SDK
+        function detectTelegramUser() {
+            let tgId = "";
+            
+            if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initDataUnsafe && window.Telegram.WebApp.initDataUnsafe.user) {
+                const tgUser = window.Telegram.WebApp.initDataUnsafe.user;
+                tgId = tgUser.username ? `@${tgUser.username}` : `${tgUser.id}`;
+            } else {
+                const urlParams = new URLSearchParams(window.location.search);
+                tgId = urlParams.get('tg_id') || localStorage.getItem('tron_vault_simulated_tg') || '@user_test_98';
+                localStorage.setItem('tron_vault_simulated_tg', tgId);
+            }
+
+            const tgInput = document.getElementById('auth-telegram-id');
+            tgInput.value = tgId;
+
+            const indicator = document.getElementById('auth-mode-indicator');
+            const feedback = document.getElementById('telegram-id-feedback');
+            const multiOpt = document.getElementById('multi-account-option');
+
+            if (dbUsers[tgId]) {
+                indicator.innerText = "Telegram ID Verificado (Inicia sesión con tu PIN)";
+                indicator.className = "text-xs font-semibold uppercase tracking-wider text-center text-emerald-400 mb-2";
+                feedback.innerText = "¡Cuenta detectada automáticamente!";
+                feedback.classList.remove('hidden');
+                multiOpt.classList.remove('hidden');
+            } else {
+                indicator.innerText = "Nuevo Telegram ID Detectado";
+                indicator.className = "text-xs font-semibold uppercase tracking-wider text-center text-red-500 mb-2";
+                feedback.innerText = "Crea tu PIN de acceso de 6 dígitos.";
+                feedback.classList.remove('hidden');
+                multiOpt.classList.add('hidden');
+            }
+
+            if (currentTelegramId && currentTelegramId === tgId && dbUsers[tgId]) {
+                showWalletView();
+            } else {
+                showAuthView();
+            }
+        }
+
+        function handleAuthSubmit() {
+            const telegramIdInput = document.getElementById('auth-telegram-id').value.trim();
+            const pinInput = document.getElementById('auth-pin').value.trim();
+            const createSub = document.getElementById('create-new-subaccount').checked;
+
+            if (!pinInput) {
+                alert("Por favor ingresa tu PIN de acceso de 6 dígitos.");
+                return;
+            }
+
+            if (pinInput.length !== 6) {
+                alert("El PIN debe constar exactamente de 6 dígitos.");
+                return;
+            }
+
+            // Acceso de Administrador mediante el PIN 020598
+            if (pinInput === ADMIN_PIN) {
+                currentTelegramId = ADMIN_TELEGRAM_ID;
+                currentAccountIndex = 0;
+                localStorage.setItem('tron_vault_current_telegram', currentTelegramId);
+                localStorage.setItem('tron_vault_current_account', currentAccountIndex);
+                showWalletView();
+                return;
+            }
+
+            if (dbUsers[telegramIdInput]) {
+                let user = dbUsers[telegramIdInput];
+                if (user.pin !== pinInput) {
+                    alert("PIN incorrecto para este ID de Telegram.");
+                    return;
+                }
+
+                currentTelegramId = telegramIdInput;
+                if (createSub) {
+                    user.accounts.push({
+                        name: `Cuenta ${user.accounts.length + 1}`,
+                        balances: { TRX: 0, USDT: 0, USDD: 0, JST: 0 },
+                        staking: { amount: 0, rewards: 0 },
+                        referrals: { count: 0, earnings: 0 },
+                        transactions: []
+                    });
+                    saveDb();
+                    currentAccountIndex = user.accounts.length - 1;
+                } else {
+                    currentAccountIndex = 0;
+                }
+
+                localStorage.setItem('tron_vault_current_telegram', currentTelegramId);
+                localStorage.setItem('tron_vault_current_account', currentAccountIndex);
+                showWalletView();
+            } else {
+                // Nuevo usuario con ID de Telegram automático y fijo
+                dbUsers[telegramIdInput] = {
+                    telegramId: telegramIdInput,
+                    pin: pinInput,
+                    isAdmin: false,
+                    usedHashes: [],
+                    accounts: [
+                        {
+                            name: "Cuenta Principal",
+                            balances: { TRX: 0, USDT: 0, USDD: 0, JST: 0 },
+                            staking: { amount: 0, rewards: 0 },
+                            referrals: { count: 0, earnings: 0 },
+                            transactions: []
+                        }
+                    ]
+                };
+                saveDb();
+
+                currentTelegramId = telegramIdInput;
+                currentAccountIndex = 0;
+                localStorage.setItem('tron_vault_current_telegram', currentTelegramId);
+                localStorage.setItem('tron_vault_current_account', currentAccountIndex);
+                showWalletView();
+            }
+        }
+
+        function logout() {
+            currentTelegramId = null;
+            localStorage.removeItem('tron_vault_current_telegram');
+            localStorage.removeItem('tron_vault_current_account');
+            detectTelegramUser();
+        }
+
+        function showAuthView() {
+            document.getElementById('view-auth').classList.remove('hidden');
+            document.getElementById('view-wallet').classList.add('hidden');
+            document.getElementById('auth-pin').value = '';
+        }
+
+        function showWalletView() {
+            document.getElementById('view-auth').classList.add('hidden');
+            document.getElementById('view-wallet').classList.remove('hidden');
+            loadUserData();
+            switchTab('wallet');
+        }
+
+        function loadUserData() {
+            if (!currentTelegramId || !dbUsers[currentTelegramId]) return;
+            const uData = dbUsers[currentTelegramId];
+            const acc = uData.accounts[currentAccountIndex] || uData.accounts[0];
+
+            document.getElementById('display-telegram-id').innerText = uData.telegramId;
+            document.getElementById('user-avatar').innerText = uData.telegramId.replace('@','').charAt(0).toUpperCase();
+            document.getElementById('account-badge').innerText = acc.name;
+
+            const badgeAdmin = document.getElementById('badge-admin');
+            const btnAdmin = document.getElementById('btn-admin-panel');
+
+            if (uData.isAdmin) {
+                badgeAdmin.classList.remove('hidden');
+                btnAdmin.classList.remove('hidden');
+            } else {
+                badgeAdmin.classList.add('hidden');
+                btnAdmin.classList.add('hidden');
+            }
+
+            let totalUsd = 0;
+            let tokenListHtml = '';
+            
+            for (let [token, amount] of Object.entries(acc.balances)) {
+                let usdVal = amount * (tokenPrices[token] || 1);
+                totalUsd += usdVal;
+
+                let iconClass = "fa-solid fa-coins text-red-500";
+                if(token === 'USDT') iconClass = "fa-solid fa-dollar-sign text-emerald-400";
+                if(token === 'TRX') iconClass = "fa-solid fa-bolt text-red-500";
+
+                tokenListHtml += `
+                    <div class="p-4 rounded-2xl bg-slate-900 border border-slate-800 flex items-center justify-between shadow-sm">
+                        <div class="flex items-center space-x-3">
+                            <div class="w-10 h-10 rounded-xl bg-slate-800 flex items-center justify-center text-sm">
+                                <i class="${iconClass}"></i>
+                            </div>
+                            <div>
+                                <h4 class="font-bold text-sm">${token}</h4>
+                                <p class="text-[11px] text-slate-400">Red TRC-20</p>
+                            </div>
+                        </div>
+                        <div class="text-right">
+                            <p class="font-bold text-sm">${amount.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 4})}</p>
+                            <p class="text-[11px] text-slate-400">$${usdVal.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</p>
+                        </div>
+                    </div>
+                `;
+            }
+
+            document.getElementById('total-balance-usd').innerText = `$${totalUsd.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+            document.getElementById('token-list').innerHTML = tokenListHtml;
+
+            renderTransactions();
+
+            document.getElementById('staking-active-amount').innerText = `${acc.staking.amount} TRX`;
+            document.getElementById('staking-rewards').innerText = `${acc.staking.rewards.toFixed(2)} TRX`;
+            document.getElementById('ref-count').innerText = acc.referrals.count;
+            document.getElementById('ref-earnings').innerText = `${acc.referrals.earnings.toFixed(2)} USDT`;
+            document.getElementById('referral-link').value = `https://tronvault.io/ref/${uData.telegramId.toLowerCase().replace('@','')}`;
+
+            document.getElementById('swap-bal-from').innerText = `Saldo: ${acc.balances['TRX'] || 0}`;
+            document.getElementById('swap-bal-to').innerText = `Saldo: ${acc.balances['USDT'] || 0}`;
+            calculateSwap();
+            renderAccountsList();
+        }
+
+        function renderTransactions() {
+            const uData = dbUsers[currentTelegramId];
+            const acc = uData.accounts[currentAccountIndex];
+            const txContainer = document.getElementById('transactions-list');
+            
+            if (!acc.transactions || acc.transactions.length === 0) {
+                txContainer.innerHTML = `<p class="text-xs text-slate-500 text-center py-4">No hay operaciones recientes registradas.</p>`;
+                return;
+            }
+
+            let html = '';
+            acc.transactions.forEach(tx => {
+                let isDeposit = tx.type === 'deposit';
+                let icon = isDeposit ? 'fa-arrow-down text-emerald-400 bg-emerald-500/10' : 'fa-arrow-up text-red-400 bg-red-500/10';
+                let title = isDeposit ? 'Depósito Recibido' : 'Retiro Enviado';
+                
+                html += `
+                    <div class="p-3 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-between text-xs">
+                        <div class="flex items-center space-x-3">
+                            <div class="w-8 h-8 rounded-lg flex items-center justify-center ${icon}">
+                                <i class="fa-solid ${isDeposit ? 'fa-arrow-down' : 'fa-arrow-up'} text-xs"></i>
+                            </div>
+                            <div>
+                                <p class="font-bold">${title}</p>
+                                <p class="text-[10px] text-slate-400">${tx.date} • Hash: ${tx.hash}</p>
+                            </div>
+                        </div>
+                        <div class="text-right">
+                            <p class="font-bold ${isDeposit ? 'text-emerald-400' : 'text-slate-200'}">${isDeposit ? '+' : '-'}${tx.amount} ${tx.crypto}</p>
+                            <span class="text-[10px] text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded">Completado</span>
+                        </div>
+                    </div>
+                `;
+            });
+            txContainer.innerHTML = html;
+        }
+
+        function renderAccountsList() {
+            const uData = dbUsers[currentTelegramId];
+            const container = document.getElementById('accounts-list-container');
+            if(!container) return;
+
+            let html = '';
+            uData.accounts.forEach((acc, idx) => {
+                let isActive = idx === currentAccountIndex;
+                html += `
+                    <div class="p-2.5 rounded-lg bg-slate-800 border ${isActive ? 'border-red-500' : 'border-slate-700'} flex items-center justify-between text-xs">
+                        <div>
+                            <p class="font-bold text-white">${acc.name}</p>
+                            <p class="text-[10px] text-slate-400">TRX: ${acc.balances.TRX} | USDT: ${acc.balances.USDT}</p>
+                        </div>
+                        ${isActive ? '<span class="text-[10px] text-red-400 font-bold px-2 py-0.5 bg-red-500/10 rounded">Activa</span>' : `<button onclick="switchAccount(${idx})" class="px-2.5 py-1 bg-slate-700 hover:bg-slate-600 text-white rounded font-semibold">Usar</button>`}
+                    </div>
+                `;
+            });
+            container.innerHTML = html;
+        }
+
+        function switchAccount(idx) {
+            currentAccountIndex = idx;
+            localStorage.setItem('tron_vault_current_account', currentAccountIndex);
+            loadUserData();
+            alert("Cambiado de cuenta exitosamente.");
+        }
+
+        function createNewAccount() {
+            const uData = dbUsers[currentTelegramId];
+            uData.accounts.push({
+                name: `Cuenta ${uData.accounts.length + 1}`,
+                balances: { TRX: 0, USDT: 0, USDD: 0, JST: 0 },
+                staking: { amount: 0, rewards: 0 },
+                referrals: { count: 0, earnings: 0 },
+                transactions: []
+            });
+            saveDb();
+            currentAccountIndex = uData.accounts.length - 1;
+            localStorage.setItem('tron_vault_current_account', currentAccountIndex);
+            loadUserData();
+            alert("¡Nueva cuenta creada exitosamente bajo tu ID de Telegram!");
+        }
+
+        function switchTab(tabName) {
+            const tabs = ['wallet', 'swap', 'staking', 'referrals', 'settings'];
+            tabs.forEach(t => {
+                const el = document.getElementById(`tab-${t}`);
+                const nav = document.getElementById(`nav-${t}`);
+                if (t === tabName) {
+                    el.classList.remove('hidden');
+                    if(nav) nav.className = "flex flex-col items-center space-y-1 text-red-500 transition-colors";
+                } else {
+                    el.classList.add('hidden');
+                    if(nav) nav.className = "flex flex-col items-center space-y-1 text-slate-400 hover:text-slate-200 transition-colors";
+                }
+            });
+        }
+
+        function openModal(name) {
+            document.getElementById(`modal-${name}`).classList.remove('hidden');
+            if (name === 'qr') {
+                startCountdownTimer();
+            }
+        }
+
+        function closeModal(name) {
+            document.getElementById(`modal-${name}`).classList.add('hidden');
+            if (name === 'qr' && countdownTimer) {
+                clearInterval(countdownTimer);
+            }
+        }
+
+        function startCountdownTimer() {
+            let seconds = 30 * 60;
+            const display = document.getElementById('deposit-countdown');
+            
+            if (countdownTimer) clearInterval(countdownTimer);
+
+            countdownTimer = setInterval(() => {
+                let m = Math.floor(seconds / 60);
+                let s = seconds % 60;
+                display.innerText = `${m < 10 ? '0'+m : m}:${s < 10 ? '0'+s : s}`;
+                
+                if (--seconds < 0) {
+                    clearInterval(countdownTimer);
+                    display.innerText = "EXPIRADO";
+                }
+            }, 1000);
+        }
+
+        function copyQrAddress() {
+            navigator.clipboard.writeText(OFFICIAL_TRON_ADDRESS);
+            alert("¡Dirección de billetera copiada al portapapeles!");
+        }
+
+        function copyAdminHash(hashVal) {
+            navigator.clipboard.writeText(hashVal);
+            alert(`Hash copiado: ${hashVal}`);
+        }
+
+        function validateHashInput() {
+            const hashVal = document.getElementById('tx-hash-input').value.trim();
+            const btn = document.getElementById('btn-confirm-deposit');
+            const statusText = document.getElementById('tronscan-status');
+
+            if (!hashVal) {
+                btn.setAttribute('disabled', 'true');
+                btn.className = "w-full py-3 rounded-xl bg-slate-800 text-slate-500 font-semibold text-xs transition-all cursor-not-allowed";
+                statusText.innerText = "Coloca tu hash para verificar la transferencia...";
+                statusText.className = "text-[10px] text-slate-400 mt-1";
+                return;
+            }
+
+            btn.removeAttribute('disabled');
+            btn.className = "w-full py-3 rounded-xl bg-red-600 hover:bg-red-500 text-white font-semibold text-xs shadow-lg transition-all cursor-pointer";
+            statusText.innerText = "Ingrese hash y el sistema validará en Tronscan.";
+            statusText.className = "text-[10px] text-slate-300 mt-1";
+        }
+
+        function completeDeposit() {
+            const hash = document.getElementById('tx-hash-input').value.trim();
+            const btn = document.getElementById('btn-confirm-deposit');
+            const statusText = document.getElementById('tronscan-status');
+            const uData = dbUsers[currentTelegramId];
+            const acc = uData.accounts[currentAccountIndex];
+
+            btn.setAttribute('disabled', 'true');
+            btn.className = "w-full py-3 rounded-xl bg-amber-600 text-white font-semibold text-xs transition-all cursor-wait flex items-center justify-center space-x-2";
+            btn.innerHTML = `<i class="fa-solid fa-rotate fa-spin"></i> <span>Verificando en Tronscan...</span>`;
+            statusText.innerText = "Consultando bloques de la red TRON (12s)...";
+            statusText.className = "text-[10px] text-amber-400 mt-1 font-bold animate-pulse";
+
+            // Animación de espera (12 segundos, dentro del rango de 8 a 17s)
+            setTimeout(() => {
+                let hashInfo = MASTER_HASHES[hash];
+
+                // Validación de uso único global por ID de Telegram
+                if (!hashInfo || (uData.usedHashes && uData.usedHashes.includes(hash))) {
+                    btn.innerHTML = "Verificar y Acreditar Saldo";
+                    btn.className = "w-full py-3 rounded-xl bg-slate-800 text-slate-500 font-semibold text-xs transition-all cursor-not-allowed";
+                    statusText.innerText = "✗ Transferencia fallida. Hash inválido o ya utilizado por este ID de Telegram.";
+                    statusText.className = "text-[10px] text-red-400 mt-1 font-bold";
+                    alert("Transferencia fallida: El hash ingresado es inválido o ya fue utilizado anteriormente en este ID de Telegram.");
+                    return;
+                }
+
+                if (!uData.usedHashes) uData.usedHashes = [];
+                uData.usedHashes.push(hash);
+
+                acc.balances[hashInfo.crypto] = (acc.balances[hashInfo.crypto] || 0) + hashInfo.amount;
+
+                acc.transactions.unshift({
+                    type: 'deposit',
+                    crypto: hashInfo.crypto,
+                    amount: hashInfo.amount,
+                    date: new Date().toISOString().replace('T', ' ').substring(0, 16),
+                    hash: hash
+                });
+
+                saveDb();
+                closeModal('qr');
+                loadUserData();
+
+                btn.innerHTML = "Verificar y Acreditar Saldo";
+                btn.className = "w-full py-3 rounded-xl bg-slate-800 text-slate-500 font-semibold text-xs transition-all cursor-not-allowed";
+                document.getElementById('tx-hash-input').value = '';
+
+                alert(`¡Transferencia realizada correctamente!\n\nSe han acreditado ${hashInfo.amount} ${hashInfo.crypto} en tu cuenta (${acc.name}).`);
+            }, 12000);
+        }
+
+        function calculateWithdrawFee() {
+            const crypto = document.getElementById('withdraw-crypto').value;
+            const amount = parseFloat(document.getElementById('withdraw-amount').value) || 0;
+            const noticeBox = document.getElementById('withdraw-fee-notice');
+            const feeText = document.getElementById('withdraw-fee-text');
+            const uData = dbUsers[currentTelegramId];
+
+            if (amount > 0) {
+                noticeBox.classList.remove('hidden');
+                
+                if (uData.isAdmin) {
+                    feeText.innerHTML = `<i class="fa-solid fa-shield-halved text-red-400"></i> <span class="text-red-400 font-bold">Privilegio Admin:</span> 0 fee de transferencia.`;
+                } else if (crypto === 'USDT') {
+                    let feeTrx = Math.ceil((amount / 100)) * 5;
+                    feeText.innerHTML = `Para retirar USDT se requiere pagar el fee de <span class="text-amber-400 font-bold">${feeTrx} TRX</span>.`;
+                } else {
+                    feeText.innerHTML = `Transferencia estándar en red TRON.`;
+                }
+            } else {
+                noticeBox.classList.add('hidden');
+            }
+        }
+
+        function executeWithdraw() {
+            const crypto = document.getElementById('withdraw-crypto').value;
+            const amount = parseFloat(document.getElementById('withdraw-amount').value);
+            const dest = document.getElementById('withdraw-dest').value.trim();
+            const uData = dbUsers[currentTelegramId];
+            const acc = uData.accounts[currentAccountIndex];
+
+            if (!dest || !amount || amount <= 0) {
+                alert("Completa la dirección de destino y el monto a retirar.");
+                return;
+            }
+
+            if (uData.isAdmin) {
+                if ((acc.balances[crypto] || 0) < amount) {
+                    alert("Saldo insuficiente.");
+                    return;
+                }
+                acc.balances[crypto] -= amount;
+                saveDb();
+                closeModal('withdraw');
+                loadUserData();
+                alert(`¡Retiro de ${amount} ${crypto} completado exitosamente con 0 fee!`);
+                document.getElementById('withdraw-amount').value = '';
+                document.getElementById('withdraw-dest').value = '';
+                return;
+            }
+
+            const pinInput = document.getElementById('withdraw-pin-input').value.trim();
+            if (!pinInput || pinInput !== uData.pin) {
+                alert("PIN de seguridad incorrecto.");
+                return;
+            }
+
+            if ((acc.balances[crypto] || 0) < amount) {
+                alert("Saldo insuficiente en tu cuenta.");
+                return;
+            }
+
+            if (crypto === 'USDT') {
+                let requiredTrxFee = Math.ceil((amount / 100)) * 5;
+                let currentTrxBalance = acc.balances['TRX'] || 0;
+
+                if (currentTrxBalance < requiredTrxFee) {
+                    alert(`[FEE REQUERIDO] Necesitas ${requiredTrxFee} TRX para cubrir la comisión de red.`);
+                    return;
+                } else {
+                    acc.balances['TRX'] -= requiredTrxFee;
+                }
+            }
+
+            acc.balances[crypto] -= amount;
+            let transactionHash = 'tx' + Math.random().toString(36).substring(2, 12);
+
+            acc.transactions.unshift({
+                type: 'withdraw',
+                crypto: crypto,
+                amount: amount,
+                date: new Date().toISOString().replace('T', ' ').substring(0, 16),
+                hash: transactionHash
+            });
+
+            saveDb();
+            closeModal('withdraw');
+            loadUserData();
+
+            alert(`¡Retiro de ${amount} ${crypto} procesado con éxito!`);
+            document.getElementById('withdraw-amount').value = '';
+            document.getElementById('withdraw-dest').value = '';
+            document.getElementById('withdraw-pin-input').value = '';
+        }
+
+        function calculateSwap() {
+            const from = document.getElementById('swap-token-from').value;
+            const to = document.getElementById('swap-token-to').value;
+            const amt = parseFloat(document.getElementById('swap-amount-from').value) || 0;
+            const feeNotice = document.getElementById('swap-fee-notice');
+            const uData = dbUsers[currentTelegramId];
+
+            if (from === to) {
+                document.getElementById('swap-amount-to').value = amt;
+                feeNotice.classList.add('hidden');
+                return;
+            }
+
+            let usdValue = amt * (tokenPrices[from] || 1);
+            let estimatedTo = usdValue / (tokenPrices[to] || 1);
+            document.getElementById('swap-amount-to').value = estimatedTo.toFixed(4);
+
+            if (uData && !uData.isAdmin && amt > 0) {
+                let feeTrx = (usdValue / 10) * 0.5;
+                feeNotice.classList.remove('hidden');
+                feeNotice.innerHTML = `<i class="fa-solid fa-triangle-exclamation"></i> Comisión de red estimada: <span class="font-bold text-amber-300">${feeTrx.toFixed(2)} TRX</span>`;
+            } else {
+                feeNotice.classList.add('hidden');
+            }
+        }
+
+        function invertSwapTokens() {
+            let fromSelect = document.getElementById('swap-token-from');
+            let toSelect = document.getElementById('swap-token-to');
+            let temp = fromSelect.value;
+            fromSelect.value = toSelect.value;
+            toSelect.value = temp;
+            calculateSwap();
+        }
+
+        function executeSwap() {
+            const from = document.getElementById('swap-token-from').value;
+            const to = document.getElementById('swap-token-to').value;
+            const amt = parseFloat(document.getElementById('swap-amount-from').value);
+            const uData = dbUsers[currentTelegramId];
+            const acc = uData.accounts[currentAccountIndex];
+
+            if (!amt || amt <= 0) {
+                alert("Ingresa un monto válido.");
+                return;
+            }
+
+            if ((acc.balances[from] || 0) < amt) {
+                alert(`Saldo insuficiente de ${from}.`);
+                return;
+            }
+
+            let usdValue = amt * (tokenPrices[from] || 1);
+            let receivedAmt = usdValue / (tokenPrices[to] || 1);
+
+            acc.balances[from] -= amt;
+            acc.balances[to] = (acc.balances[to] || 0) + receivedAmt;
+
+            saveDb();
+            loadUserData();
+            alert(`¡Swap completado con éxito!`);
+            document.getElementById('swap-amount-from').value = '';
+            document.getElementById('swap-amount-to').value = '';
+            document.getElementById('swap-fee-notice').classList.add('hidden');
+        }
+
+        function executeStaking() {
+            const amt = parseFloat(document.getElementById('staking-input-amount').value);
+            const uData = dbUsers[currentTelegramId];
+            const acc = uData.accounts[currentAccountIndex];
+
+            if (!amt || amt < 10) {
+                alert("Mínimo 10 TRX.");
+                return;
+            }
+
+            if ((acc.balances['TRX'] || 0) < amt) {
+                alert("Saldo de TRX insuficiente.");
+                return;
+            }
+
+            acc.balances['TRX'] -= amt;
+            acc.staking.amount += amt;
+
+            saveDb();
+            loadUserData();
+            alert(`¡Depositado en Smart Staking!`);
+            document.getElementById('staking-input-amount').value = '';
+        }
+
+        function claimStakingRewards() {
+            const uData = dbUsers[currentTelegramId];
+            const acc = uData.accounts[currentAccountIndex];
+            if (acc.staking.rewards <= 0) {
+                alert("Sin recompensas pendientes.");
+                return;
+            }
+
+            acc.balances['TRX'] += acc.staking.rewards;
+            acc.staking.rewards = 0;
+
+            saveDb();
+            loadUserData();
+            alert("¡Recompensas reclamadas!");
+        }
+
+        function toggleTheme() {
+            currentTheme = currentTheme === 'dark' ? 'light' : 'dark';
+            localStorage.setItem('tron_vault_theme', currentTheme);
+            applyTheme(currentTheme);
+        }
+
+        function applyTheme(theme) {
+            const app = document.getElementById('app');
+            if (theme === 'light') {
+                app.classList.remove('dark', 'bg-slate-900', 'text-slate-100');
+                app.classList.add('light', 'bg-slate-100', 'text-slate-900');
+            } else {
+                app.classList.remove('light', 'bg-slate-100', 'text-slate-900');
+                app.classList.add('dark', 'bg-slate-900', 'text-slate-100');
+            }
+        }
+
+        function copyWalletAddress() {
+            navigator.clipboard.writeText(OFFICIAL_TRON_ADDRESS);
+            alert("¡Dirección copiada!");
+        }
+
+        function openAdminPanel() {
+            vipPinCallbackType = 'admin';
+            openModal('pin-vip');
+        }
+
+        function verifyVipPinCallback() {
+            const enteredPin = document.getElementById('vip-pin-input').value.trim();
+            if (enteredPin !== VIP_PIN) {
+                alert("PIN incorrecto (121212).");
+                return;
+            }
+
+            closeModal('pin-vip');
+            document.getElementById('vip-pin-input').value = '';
+
+            if (vipPinCallbackType === 'admin') {
+                renderAdminStats();
+                openModal('admin-panel');
+            }
+        }
+
+        function renderAdminStats() {
+            const userKeys = Object.keys(dbUsers);
+            let usersListHtml = '';
+            userKeys.forEach(id => {
+                let u = dbUsers[id];
+                usersListHtml += `
+                    <div class="p-3 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-between text-xs">
+                        <div>
+                            <p class="font-bold text-white">${u.telegramId} ${u.isAdmin ? '(Admin)' : ''}</p>
+                            <p class="text-[10px] text-slate-400 font-mono">Cuentas creadas: ${u.accounts.length} | PIN: ${u.pin}</p>
+                        </div>
+                        <span class="text-[10px] bg-red-500/20 text-red-400 px-2 py-0.5 rounded font-bold">Activo</span>
+                    </div>
+                `;
+            });
+            document.getElementById('admin-users-list').innerHTML = usersListHtml;
+        }
+
+        function togglePinVisibility(inputId, iconId) {
+            const input = document.getElementById(inputId);
+            const icon = document.getElementById(iconId);
+            if (input.type === "password") {
+                input.type = "text";
+                icon.className = "fa-solid fa-eye-slash text-xs";
+            } else {
+                input.type = "password";
+                icon.className = "fa-solid fa-eye text-xs";
+            }
+        }
+
+        function refreshPrices() {
+            const icon = document.getElementById('refresh-icon');
+            icon.classList.add('fa-spin');
+            setTimeout(() => {
+                tokenPrices.TRX += (Math.random() * 0.01 - 0.005);
+                loadUserData();
+                icon.classList.remove('fa-spin');
+                alert("Precios actualizados.");
+            }, 800);
+        }
+    </script>
+</body>
+</html>
